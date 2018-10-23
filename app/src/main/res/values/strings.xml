@@ -5,4 +5,6 @@
     <string name="no_camera_permission">This application cannot run because it does not have the camera permission.  The application will now exit.</string>
     <string name="not_ready_message">Why so serious? :)</string>
     <string name="ready_message">Just wink now</string>
+    <string name="start">Start service</string>
+    <string name="stop">Stop service</string>
 </resources>

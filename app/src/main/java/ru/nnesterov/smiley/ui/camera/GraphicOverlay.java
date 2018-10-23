@@ -98,7 +98,7 @@ public class GraphicOverlay extends View {
          * system.
          */
         public float translateX(float x) {
-            if (mOverlay.mFacing == CameraSource.CAMERA_FACING_FRONT) {
+            if (mOverlay.mFacing == CameraSource.CAMERA_FACING_BACK) {
                 return mOverlay.getWidth() - scaleX(x);
             } else {
                 return scaleX(x);
@@ -179,7 +179,7 @@ public class GraphicOverlay extends View {
             }
 
             for (Graphic graphic : mGraphics) {
-                graphic.draw(canvas);
+//                graphic.draw(canvas);
             }
         }
     }

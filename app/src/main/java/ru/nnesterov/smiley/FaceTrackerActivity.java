@@ -23,13 +23,24 @@ import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.graphics.Bitmap;
+import android.graphics.drawable.BitmapDrawable;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
+import android.os.Environment;
+import android.provider.MediaStore;
 import android.support.design.widget.Snackbar;
 import android.support.v4.app.ActivityCompat;
+import android.support.v4.content.ContextCompat;
+import android.support.v4.content.FileProvider;
 import android.support.v7.app.AppCompatActivity;
 import android.util.Log;
+import android.view.SurfaceView;
 import android.view.View;
+import android.widget.ImageView;
+import android.widget.TextView;
+import android.widget.Toast;
 
 import com.google.android.gms.common.ConnectionResult;
 import com.google.android.gms.common.GoogleApiAvailability;
@@ -39,8 +50,22 @@ import com.google.android.gms.vision.Tracker;
 import com.google.android.gms.vision.face.Face;
 import com.google.android.gms.vision.face.FaceDetector;
 
+import java.io.BufferedInputStream;
+import java.io.BufferedOutputStream;
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.net.Socket;
+import java.net.UnknownHostException;
+import java.sql.Date;
+import java.sql.Time;
+import java.text.SimpleDateFormat;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import ru.nnesterov.smiley.ui.camera.CameraSourcePreview;
 import ru.nnesterov.smiley.ui.camera.GraphicOverlay;
@@ -50,8 +75,10 @@ import ru.nnesterov.smiley.ui.camera.GraphicOverlay;
  * overlay graphics to indicate the position, size, and ID of each face.
  */
 public final class FaceTrackerActivity extends AppCompatActivity {
+    private  int BUFFER_SIZE = 6 * 1024;
+    public static String directory = "hi";
     private static final String TAG = "FaceTracker";
-
+    private SurfaceView mSurfaceView;
     private CameraSource mCameraSource = null;
 
     private CameraSourcePreview mPreview;
@@ -60,6 +87,11 @@ public final class FaceTrackerActivity extends AppCompatActivity {
     private static final int RC_HANDLE_GMS = 9001;
     // permission request codes need to be < 256
     private static final int RC_HANDLE_CAMERA_PERM = 2;
+    private static int REQUEST_WRITE_STORAGE ;
+    private FaceDetector faceDetector;
+
+    public static final int STATUS_CODE = 0;
+
 
     //==============================================================================================
     // Activity Methods
@@ -68,23 +100,49 @@ public final class FaceTrackerActivity extends AppCompatActivity {
     /**
      * Initializes the UI and initiates the creation of a face detector.
      */
+    final String LOG_TAG = "myLogs";
+    File photoFile;
+    Bitmap bmp;
+    ImageView iv;
+   // String directory = "hi";
     @Override
     public void onCreate(Bundle icicle) {
         super.onCreate(icicle);
         setContentView(R.layout.main);
+        requestAppPermissions();
+//        String storageDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES) + File.separator + directory;
+//
+//        // First Create Directory
+//        File outputFile = new File(storageDir);
+//        outputFile.mkdirs();
 
-        mPreview = (CameraSourcePreview) findViewById(R.id.preview);
+//        // Now Create File
+//        outputFile = new File(storageDir,"testing.png");
+//        FileOutputStream out = null;
+//        try {
+//            out = new FileOutputStream(outputFile);
+//        } catch (FileNotFoundException e) {
+//            e.printStackTrace();
+//        }
+        //bmp.compress(Bitmap.CompressFormat.PNG, 100, out);
+
+        /*File pictures = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES);
+        photoFile = new File(pictures, "myphoto.jpg");*/
+
+       mPreview = (CameraSourcePreview) findViewById(R.id.preview);
         mGraphicOverlay = (GraphicOverlay) findViewById(R.id.faceOverlay);
 
         // Check for the camera permission before accessing the camera.  If the
         // permission is not granted yet, request permission.
-        int rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
+      int rc = ActivityCompat.checkSelfPermission(this, Manifest.permission.CAMERA);
         if (rc == PackageManager.PERMISSION_GRANTED) {
             createCameraSource();
         } else {
             requestCameraPermission();
         }
-    }
+
+}
+
 
     /**
      * Handles the requesting of the camera permission.  This includes
@@ -118,6 +176,30 @@ public final class FaceTrackerActivity extends AppCompatActivity {
                 .show();
     }
 
+    private void requestAppPermissions() {
+        if (android.os.Build.VERSION.SDK_INT < Build.VERSION_CODES.LOLLIPOP) {
+            return;
+        }
+
+        if (hasReadPermissions() && hasWritePermissions()) {
+            return;
+        }
+
+
+        ActivityCompat.requestPermissions(this,
+                new String[] {
+                        Manifest.permission.READ_EXTERNAL_STORAGE,
+                        Manifest.permission.WRITE_EXTERNAL_STORAGE
+                }, REQUEST_WRITE_STORAGE); // your request code
+    }
+
+    private boolean hasReadPermissions() {
+        return (ContextCompat.checkSelfPermission(getBaseContext(), Manifest.permission.READ_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED);
+    }
+
+    private boolean hasWritePermissions() {
+        return (ContextCompat.checkSelfPermission(getBaseContext(), Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED);
+    }
     /**
      * Creates and starts the camera.  Note that this uses a higher resolution in comparison
      * to other detection examples to enable the barcode detector to detect small barcodes
@@ -149,7 +231,7 @@ public final class FaceTrackerActivity extends AppCompatActivity {
 
         mCameraSource = new CameraSource.Builder(context, detector)
                 .setRequestedPreviewSize(640, 480)
-                .setFacing(CameraSource.CAMERA_FACING_FRONT)
+                .setFacing(CameraSource.CAMERA_FACING_BACK)
                 .setRequestedFps(30.0f)
                 .build();
     }
@@ -160,9 +242,10 @@ public final class FaceTrackerActivity extends AppCompatActivity {
     @Override
     protected void onResume() {
         super.onResume();
-
         startCameraSource();
+
     }
+
 
     /**
      * Stops the camera.
@@ -171,6 +254,7 @@ public final class FaceTrackerActivity extends AppCompatActivity {
     protected void onPause() {
         super.onPause();
         mPreview.stop();
+
     }
 
     /**
@@ -180,9 +264,7 @@ public final class FaceTrackerActivity extends AppCompatActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        if (mCameraSource != null) {
-            mCameraSource.release();
-        }
+
     }
 
     /**
@@ -265,22 +347,26 @@ public final class FaceTrackerActivity extends AppCompatActivity {
 
     private void takeShot() {
         mCameraSource.takePicture(null, new CameraSource.PictureCallback() {
-            @Override
+           @Override
             public void onPictureTaken(byte[] bytes) {
-                mPreview.stop();
+           // mPreview.stop();
                 File shot = null;
                 try {
-                    shot = FileUtils.saveImage(bytes, "jpg");
+                        shot = FileUtils.saveImage(bytes, "png");
+
                 } catch (IOException e) {
                     e.printStackTrace();
-                    return;
+
+                    return ;
                 }
-                Intent shareIntent = new Intent(Intent.ACTION_SEND);
-                shareIntent.setType("image/jpeg");
-                shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(shot));
-                startActivity(Intent.createChooser(shareIntent, ""));
+//               Intent shareIntent = new Intent(Intent.ACTION_SEND);
+//                shareIntent.setType("image/png");
+//                shareIntent.putExtra(Intent.EXTRA_STREAM, Uri.fromFile(shot));
+//                startActivity(Intent.createChooser(shareIntent, ""));
             }
         });
+
+
     }
 
     //==============================================================================================
@@ -303,7 +389,7 @@ public final class FaceTrackerActivity extends AppCompatActivity {
      * associated face overlay.
      */
     private class GraphicFaceTracker extends Tracker<Face> {
-        private static final double SMILING_THRESHOLD = 0.4;
+        private static final double SMILING_THRESHOLD = 0.2;
         private static final double WINK_THRESHOLD = 0.5;
         private GraphicOverlay mOverlay;
         private FaceGraphic mFaceGraphic;
@@ -324,16 +410,14 @@ public final class FaceTrackerActivity extends AppCompatActivity {
         /**
          * Update the position/characteristics of the face within the overlay.
          */
+
         @Override
         public void onUpdate(FaceDetector.Detections<Face> detectionResults, Face face) {
             mOverlay.add(mFaceGraphic);
             boolean isSmiling = face.getIsSmilingProbability() > SMILING_THRESHOLD;
+
             if (isSmiling) {
-                float leftEye = face.getIsLeftEyeOpenProbability();
-                float rightEye = face.getIsRightEyeOpenProbability();
-                if (Math.abs(leftEye - rightEye) >= WINK_THRESHOLD) {
-                    takeShot();
-                }
+                takeShot();
             }
 
             mFaceGraphic.setIsReady(isSmiling);
@@ -350,6 +434,7 @@ public final class FaceTrackerActivity extends AppCompatActivity {
             mOverlay.remove(mFaceGraphic);
         }
 
+
         /**
          * Called when the face is assumed to be gone for good. Remove the graphic annotation from
          * the overlay.
@@ -357,6 +442,60 @@ public final class FaceTrackerActivity extends AppCompatActivity {
         @Override
         public void onDone() {
             mOverlay.remove(mFaceGraphic);
+            System.out.println("hohohohohohoh");
+                     FaceTrackerActivity.main();
+        }
+
+
+
+
+
+    }
+
+    public static void main() {
+
+        String zipFile = Environment.getExternalStorageDirectory().getPath() + "/Pictures/london.zip";
+        String srcDir = Environment.getExternalStorageDirectory().getPath() + "/Pictures/hi";
+
+        try {
+
+            // create byte buffer
+            byte[] buffer = new byte[1024];
+
+            FileOutputStream fos = new FileOutputStream(zipFile);
+
+            ZipOutputStream zos = new ZipOutputStream(fos);
+
+            File dir = new File(srcDir);
+
+            File[] files = dir.listFiles();
+
+            for (int i = 0; i < files.length; i++) {
+
+                System.out.println("Adding file: " + files[i].getName());
+
+                FileInputStream fis = new FileInputStream(files[i]);
+
+                // begin writing a new ZIP entry, positions the stream to the start of the entry data
+                zos.putNextEntry(new ZipEntry(files[i].getName()));
+
+                int length;
+
+                while ((length = fis.read(buffer)) > 0) {
+                    zos.write(buffer, 0, length);
+                }
+
+                zos.closeEntry();
+
+                // close the InputStream
+                fis.close();
+            }
+
+            // close the ZipOutputStream
+            zos.close();
+
+        } catch (IOException ioe) {
+            System.out.println("Error creating zip file" + ioe);
         }
 
     }

@@ -37,7 +37,7 @@ class FaceGraphic extends GraphicOverlay.Graphic {
 
     private Paint mPaint;
 
-    private volatile Face mFace;
+    public volatile Face mFace;
     private int mFaceId;
     private boolean mIsReady = false;
     private final String mNotReadyMessage;
@@ -71,18 +71,18 @@ class FaceGraphic extends GraphicOverlay.Graphic {
      */
     void updateFace(Face face) {
         mFace = face;
-        postInvalidate();
+
     }
+
 
     /**
      * Draws the face annotations for position on the supplied canvas.
      */
     @Override
-    public void draw(Canvas canvas) {
+
+
+   public void draw(Canvas canvas) {
         Face face = mFace;
-        if (face == null) {
-            return;
-        }
 
         // Draws a circle at the position of the detected face, with the face's track id below.
         float x = translateX(face.getPosition().x + face.getWidth() / 2);
@@ -98,8 +98,8 @@ class FaceGraphic extends GraphicOverlay.Graphic {
         float right = x + xOffset;
         float bottom = y + yOffset;
 
-        canvas.drawText(mIsReady ? mReadyMessage : mNotReadyMessage, left, top - LABEL_Y_OFFSET, mPaint);
+       // canvas.drawText(mIsReady ? mReadyMessage : mNotReadyMessage, left, top - LABEL_Y_OFFSET, mPaint);
 
-        canvas.drawRect(left, top, right, bottom, mPaint);
+      // canvas.drawRect(left, top, right, bottom, mPaint);
     }
 }
